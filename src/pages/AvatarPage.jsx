@@ -35,7 +35,7 @@ const PERSONA_CONFIG = {
   name: "Ava",
   avatarId: "30fa96d0-26c4-4e55-94a0-517025942e18",
   voiceId: "91627ebb-7530-4235-bbf2-8c12af2e601c",
-  llmId: "30fa96d0-26c4-4e55-94a0-517025942e18",
+  llmId: "ANAM_GPT_4O_MINI_V1",
   systemPrompt: `
 You are "Ava", an AI laptop showroom assistant running on a display laptop in a shop.
 
