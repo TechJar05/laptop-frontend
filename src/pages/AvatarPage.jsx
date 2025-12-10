@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import {
   Cpu,
   HardDrive,
@@ -10,16 +9,20 @@ import {
   User,
   Camera,
   Sparkles,
+  Zap,
+  Activity,
+  CircleDot,
+  Send,
 } from "lucide-react";
-import { createClient } from "@anam-ai/js-sdk";
-// If needed: import { AnamEvent } from "@anam-ai/js-sdk";
+import { createClient } from "@anam-ai/js-sdk"; // ✅ Anam SDK
 
+// 🔑 API key (move to .env in real project)
 const ANAM_API_KEY =
   import.meta.env.VITE_ANAM_API_KEY || "YOUR_ANAM_API_KEY_HERE";
 
-// 🔧 Laptop specs (could later come from props/API)
+// Laptop specs for the persona prompt
 const LAPTOP_SPECS = {
-  model: "Aptara NexBook 15",
+  model: "Lenovo NexBook 15",
   cpu: "Intel Core i7 12700H",
   ramGB: 16,
   storage: "512GB NVMe SSD",
@@ -27,17 +30,16 @@ const LAPTOP_SPECS = {
   os: "Windows 11 Pro",
 };
 
+// Persona config for Anam
 const PERSONA_CONFIG = {
   name: "Ava",
-      avatarId: "30fa96d0-26c4-4e55-94a0-517025942e18",
-      voiceId: "f37690b1-424a-4e55-886f-9e3022cfb90a",
-      llmId: "9d8900ee-257d-4401-8817-ba9c835e9d36",
+  avatarId: "30fa96d0-26c4-4e55-94a0-517025942e18",
+  voiceId: "91627ebb-7530-4235-bbf2-8c12af2e601c",
+  llmId: "30fa96d0-26c4-4e55-94a0-517025942e18",
   systemPrompt: `
-You are "Ava", an AI showroom sales assistant running on a display laptop inside a retail store.
+You are "Ava", an AI laptop showroom assistant running on a display laptop in a shop.
 
-You must ALWAYS behave like a friendly, knowledgeable laptop salesperson standing next to THIS exact laptop.
-
-This specific laptop has the following real, detected hardware specifications:
+This specific laptop has the following real specs:
 - Model: ${LAPTOP_SPECS.model}
 - Processor (CPU): ${LAPTOP_SPECS.cpu}
 - RAM: ${LAPTOP_SPECS.ramGB} GB
@@ -45,132 +47,42 @@ This specific laptop has the following real, detected hardware specifications:
 - Graphics (GPU): ${LAPTOP_SPECS.gpu}
 - Operating System: ${LAPTOP_SPECS.os}
 
-----------------------
-STRICT HARDWARE RULES
-----------------------
-1. When the customer asks about:
-   - RAM
-   - Processor
-   - Storage
-   - Graphics
-   - Operating System  
-   You MUST ONLY use the values listed above.
-2. NEVER guess, approximate, or invent any hardware specification.
-3. If the user asks about unlisted specs like:
-   battery, camera, display refresh rate, weight, ports:
-   Say clearly:
-   "That specific detail is not available in my system for this laptop."
-
-----------------------
-USAGE & PERFORMANCE QUESTIONS
-----------------------
-You MUST properly answer:
-- "Is this good for gaming?"
-- "Can I do video editing?"
-- "Is this good for programming?"
-- "Can I run GTA 5?"
-- "Is this good for office work?"
-- "Is this fine for students?"
-- "Is this good for business use?"
-
-Rules:
-- Answer as YES / NO + short explanation.
-- Judge based on CPU + RAM + GPU only.
-- Keep explanation simple for non-technical people.
-
-----------------------
-GAMING RESPONSE RULES
-----------------------
-Supported games:
-GTA 5, Valorant, PUBG PC, CS:GO, Fortnite, FIFA, Call of Duty.
-
-You MUST answer in format:
-"Yes, this laptop can run <game> smoothly on low/medium/high settings."
-OR
-"This laptop is not recommended for heavy gaming like <game>."
-
-----------------------
-COMPARISON QUESTIONS
-----------------------
-Questions like:
-- "Is this better than i5?"
-- "Is this better than Ryzen 5?"
-- "Is this better than i3?"
-
-You MUST:
-Compare generally in performance category ONLY.
-Never use benchmark numbers.
-
-----------------------
-PRICE, EMI & OFFERS (STRICT)
-----------------------
-If asked:
-- Price
-- EMI
-- Discount
-- Finance
-- Exchange
-
-ALWAYS reply:
-"Pricing, offers, EMI, and exchange options are handled directly by the store staff. Please ask the salesperson for the latest price."
-
-NEVER invent prices.
-
-----------------------
-STUDENT / OFFICE / BUSINESS GUIDANCE
-----------------------
-Always classify use as:
-- BASIC
-- GOOD
-- VERY GOOD
-- PROFESSIONAL
-
-Use CPU + RAM + GPU logic to explain.
-
-----------------------
-LANGUAGE & TONE
-----------------------
-- Friendly
-- Confident
-- Honest
-- Never robotic
-- Never too technical
-- Talk like a real showroom salesperson
-
-----------------------
-OUTSIDE TOPIC CONTROL
-----------------------
-If the user asks something unrelated:
-"I'm here to help you with this laptop. You can ask me anything about its performance or usage."
-
-----------------------
-AUTO GREETING ON START
-----------------------
-When conversation begins, greet:
-"Hello! I'm your smart laptop assistant. You can ask me anything about this laptop — whether it's good for gaming, programming, office work, or student use."
-`
+RULES:
+1. If the customer asks about hardware details like RAM, processor, storage, graphics card or OS,
+   answer ONLY using the above specs. Do NOT guess or invent new hardware values.
+2. If they ask “Is this good for gaming / editing / programming / GTA 5 / etc.”:
+   - Use your general knowledge about these specs.
+   - Explain in very simple, friendly language.
+   - Give clear YES/NO plus short explanation.
+3. Always speak as if you are THIS laptop, in a shop, talking directly to the customer.
+4. Examples of questions you should handle well:
+   - "How much RAM is there?" → answer with RAM from above.
+   - "Is this good for video editing?" → talk about CPU + RAM + GPU simply.
+   - "Can I use this for programming?" → talk about multitasking, IDEs, etc.
+5. Your tone: warm, simple, non-technical, like explaining to a non-IT customer.
+`,
 };
 
 const AvatarPage = () => {
   const personaVideoRef = useRef(null);
   const camPreviewRef = useRef(null);
 
-  const [status, setStatus] = useState(
-    "Initializing kiosk... please allow camera and microphone access."
-  );
+  const [status, setStatus] = useState("Initializing kiosk...");
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isAvatarReady, setIsAvatarReady] = useState(false);
   const [message, setMessage] = useState("");
   const [customerDetected, setCustomerDetected] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
+  // Internal refs for Anam + camera handling
   const anamClientRef = useRef(null);
   const avatarStartedRef = useRef(false);
-  const faceDetectorIntervalRef = useRef(null);
   const cameraStreamRef = useRef(null);
+  const faceDetectorIntervalRef = useRef(null);
 
-  // -------------------------
-  // Camera + Face Detection
-  // -------------------------
+  // -----------------------------
+  // Camera + Face Detection setup
+  // -----------------------------
   useEffect(() => {
     let cancelled = false;
 
@@ -183,7 +95,7 @@ const AvatarPage = () => {
           return;
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({
+       const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 640, height: 480 },
           audio: false, // camera stream only, Anam handles mic on its side
         });
@@ -192,7 +104,9 @@ const AvatarPage = () => {
 
         cameraStreamRef.current = stream;
         setIsCameraReady(true);
+        setStatus("Camera access granted. Waiting for customer...");
 
+        // Attach stream to hidden preview video for FaceDetector
         if (camPreviewRef.current) {
           camPreviewRef.current.srcObject = stream;
           camPreviewRef.current.muted = true;
@@ -201,8 +115,7 @@ const AvatarPage = () => {
             .catch((err) => console.warn("Cam preview play error:", err));
         }
 
-        setStatus("Waiting for a customer in front of the laptop...");
-
+        // Face detection if supported
         if ("FaceDetector" in window) {
           const FaceDetector = window.FaceDetector;
           const detector = new FaceDetector({
@@ -219,7 +132,7 @@ const AvatarPage = () => {
               if (faces.length > 0) {
                 setCustomerDetected(true);
                 setStatus("Customer detected! Starting assistant...");
-                startAvatarWithIntro();
+                startAvatar();
               }
             } catch (err) {
               console.error("Face detection error:", err);
@@ -227,14 +140,15 @@ const AvatarPage = () => {
           }, 1000);
         } else {
           console.warn(
-            "FaceDetector not supported. Using fallback auto-start in 5 seconds."
+            "FaceDetector not available, using fallback timed start."
           );
+          // Fallback: start after a short delay if no face API
           setTimeout(() => {
             if (!avatarStartedRef.current) {
               setStatus(
                 "Starting assistant (fallback, no face detection support)..."
               );
-              startAvatarWithIntro();
+              startAvatar();
             }
           }, 5000);
         }
@@ -258,13 +172,19 @@ const AvatarPage = () => {
       if (cameraStreamRef.current) {
         cameraStreamRef.current.getTracks().forEach((t) => t.stop());
       }
+
+      if (anamClientRef.current) {
+        anamClientRef.current
+          .stopStreaming?.()
+          .catch((err) => console.error("Error stopping Anam stream:", err));
+      }
     };
   }, []);
 
-  // -------------------------
-  // Start Avatar Session
-  // -------------------------
-  const startAvatarWithIntro = async () => {
+  // -----------------------------
+  // Start Anam avatar session
+  // -----------------------------
+  const startAvatar = async () => {
     if (avatarStartedRef.current) return;
     avatarStartedRef.current = true;
 
@@ -288,7 +208,7 @@ const AvatarPage = () => {
       const client = createClient(data.sessionToken);
       anamClientRef.current = client;
 
-      // 🔴 IMPORTANT: pass ID string (like in your AvatarFrame)
+      // Important: pass the video element ID string (like your AvatarFrame)
       await client.streamToVideoElement("persona-video");
 
       setIsAvatarReady(true);
@@ -296,6 +216,7 @@ const AvatarPage = () => {
         "Assistant ready. Speak and ask about this laptop’s configuration."
       );
 
+      // Intro speech
       client.talk(`
 Hi there! I'm your smart laptop assistant.
 You can ask me questions like:
@@ -313,241 +234,449 @@ Just speak normally, and I’ll answer for this exact laptop on the table.
     }
   };
 
-  // -------------------------
-  // Manual text send (testing)
-  // -------------------------
+  // -----------------------------
+  // Manual text → avatar
+  // -----------------------------
   const handleSendMessage = () => {
-    if (!message.trim() || !anamClientRef.current) return;
-    anamClientRef.current.talk(message.trim());
+    if (!message.trim()) return;
+
+    // Show your listening animation
+    setIsListening(true);
+    setTimeout(() => setIsListening(false), 2000);
+
+    // Send text to avatar if session active
+    if (anamClientRef.current) {
+      anamClientRef.current.talk(message.trim());
+    }
+
     setMessage("");
   };
 
-  const StatusPill = ({ icon: Icon, label, active, color }) => (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs
-        border backdrop-blur-md
-        ${
-          active
-            ? `border-${color}-400/70 bg-${color}-500/10 text-${color}-100`
-            : "border-slate-600/60 bg-slate-900/40 text-slate-400"
-        }`}
-    >
-      <Icon className="h-3.5 w-3.5" />
-      <span>{label}</span>
-      <span
-        className={`ml-1 h-2 w-2 rounded-full ${
-          active ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
-        }`}
-      />
-    </motion.div>
-  );
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-slate-950 to-indigo-950 text-slate-100 flex items-center justify-center px-4 py-8">
-      <div className="relative w-full max-w-6xl">
-        <div className="pointer-events-none absolute -top-24 -left-16 h-64 w-64 rounded-full bg-purple-600/30 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 -right-10 h-72 w-72 rounded-full bg-blue-500/30 blur-3xl" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden">
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.3; }
+          50% { transform: translate(10px, -10px) scale(1.1); opacity: 0.5; }
+        }
+        @keyframes float-reverse {
+          0%, 100% { transform: translate(0, 0) scale(1.2); opacity: 0.2; }
+          50% { transform: translate(-10px, 10px) scale(1); opacity: 0.4; }
+        }
+        @keyframes float-center {
+          0%, 100% { transform: translate(-50%, -50%) translateY(0); opacity: 0.2; }
+          50% { transform: translate(-50%, -50%) translateY(-20px); opacity: 0.3; }
+        }
+        @keyframes pulse-glow {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 1; }
+        }
+        @keyframes spin-slow {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes wave {
+          0%, 100% { height: 8px; }
+          50% { height: 16px; }
+        }
+        @keyframes slide-up {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slide-left {
+          from { opacity: 0; transform: translateX(-20px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slide-right {
+          from { opacity: 0; transform: translateX(20px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes border-pulse {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 1; }
+        }
+        @keyframes dot-pulse {
+          0%, 100% { transform: scale(1); opacity: 0.8; }
+          50% { transform: scale(1.2); opacity: 1; }
+        }
+        .animate-float { animation: float 8s ease-in-out infinite; }
+        .animate-float-reverse { animation: float-reverse 10s ease-in-out infinite; }
+        .animate-float-center { animation: float-center 6s ease-in-out infinite; }
+        .animate-pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
+        .animate-spin-slow { animation: spin-slow 20s linear infinite; }
+        .animate-wave-1 { animation: wave 0.6s ease-in-out infinite; }
+        .animate-wave-2 { animation: wave 0.6s ease-in-out infinite 0.15s; }
+        .animate-wave-3 { animation: wave 0.6s ease-in-out infinite 0.3s; }
+        .animate-slide-up { animation: slide-up 0.8s ease-out; }
+        .animate-slide-left { animation: slide-left 0.8s ease-out; }
+        .animate-slide-right { animation: slide-right 0.8s ease-out; }
+        .animate-border-pulse { animation: border-pulse 3s ease-in-out infinite; }
+        .animate-dot-pulse { animation: dot-pulse 2s ease-in-out infinite; }
+        .glass-morphism {
+          background: rgba(255, 255, 255, 0.02);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .neumorphic {
+          background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+        .inner-glow::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          background: linear-gradient(to bottom right, rgba(255,255,255,0.04), transparent);
+          pointer-events: none;
+        }
+      `}</style>
 
-        <motion.div
-          initial={{ opacity: 0, y: 18, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.7, ease: "easeOut" }}
-          className="relative backdrop-blur-2xl bg-slate-900/70 border border-slate-700/60 shadow-[0_25px_80px_rgba(0,0,0,0.75)] rounded-3xl overflow-hidden"
-        >
+      {/* Hidden camera preview (for face detection) – not visible, so UI unchanged */}
+      <video
+        ref={camPreviewRef}
+        autoPlay
+        playsInline
+        muted
+        className="hidden"
+      />
+
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-1/2 -left-1/4 w-96 h-96 bg-gradient-to-br from-purple-600/30 to-blue-600/30 rounded-full blur-3xl animate-float" />
+        <div className="absolute -bottom-1/2 -right-1/4 w-[500px] h-[500px] bg-gradient-to-tl from-indigo-600/30 to-cyan-600/30 rounded-full blur-3xl animate-float-reverse" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-r from-pink-600/20 to-purple-600/20 rounded-full blur-3xl animate-float-center" />
+      </div>
+
+      {/* Grid pattern overlay */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px] pointer-events-none" />
+
+      <div className="relative z-10 flex items-center justify-center min-h-screen p-4 md:p-8">
+        <div className="w-full max-w-7xl animate-slide-up">
           {/* Header */}
-          <div className="flex flex-col md:flex-row items-start justify-between border-b border-slate-700/70 px-6 sm:px-10 py-6 gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/40">
-                  <Bot className="h-5 w-5 text-white" />
+          <div className="mb-8">
+            <div className="relative glass-morphism neumorphic rounded-3xl p-6 inner-glow">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="relative group cursor-pointer">
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl blur-xl opacity-60 group-hover:opacity-80 transition-opacity" />
+                    <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                      <Bot className="h-7 w-7 text-white" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-bold font-sans text-white flex items-center gap-2">
+                      Smart-Specs Kiosk
+                      <div className="animate-spin-slow">
+                        <Sparkles className="h-5 w-5 text-indigo-400" />
+                      </div>
+                    </h1>
+                    <p className="text-sm text-slate-400 mt-1">
+                      Powered by intelligent avatar assistant
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-50 flex items-center gap-2">
-                    Laptop Kiosk
-                    
-                  </h1>
-                  <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                    AI avatar that explains laptop’s configuration in
-                    simple language.
-                  </p>
+
+                {/* Status indicators */}
+                <div className="flex items-center gap-3">
+                  {/* <StatusBadge
+                    icon={Camera}
+                    label="Camera"
+                    active={isCameraReady}
+                  />
+                  <StatusBadge
+                    icon={User}
+                    label="Customer"
+                    active={customerDetected}
+                  /> */}
+                  <StatusBadge
+                    icon={Activity}
+                    label="AI Ready"
+                    active={isAvatarReady}
+                  />
                 </div>
               </div>
             </div>
-
-            
           </div>
 
-          {/* Main content */}
-          <div className="grid lg:grid-cols-[1.5fr_1fr] gap-6 lg:gap-8 px-6 sm:px-10 py-6 sm:py-8">
-            {/* LEFT: Avatar / video */}
-            <div className="space-y-4">
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="relative overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-950/70 backdrop-blur-xl shadow-lg shadow-indigo-900/60"
-              >
-                <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-indigo-500/40" />
-                <video
-                  id="persona-video"
-                  ref={personaVideoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-[260px] sm:h-[320px] object-cover rounded-2xl bg-black"
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 py-3 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-xs text-slate-200">
-                    <Sparkles className="h-4 w-4 text-indigo-300" />
-                    <span>Ava is your AI guide for laptop.</span>
+          {/* Main content grid */}
+          <div className="grid lg:grid-cols-[1.4fr_1fr] gap-6">
+            {/* Left column - Avatar */}
+            <div className="space-y-6 animate-slide-left">
+              {/* Avatar video container */}
+              <div className="relative group">
+                <div className="relative glass-morphism neumorphic rounded-3xl p-4 inner-glow">
+                  <div className="relative overflow-hidden rounded-2xl">
+                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
+
+                    <div className="absolute inset-0 rounded-2xl border-2 border-indigo-500/30 pointer-events-none animate-border-pulse" />
+
+                    <video
+                      id="persona-video"
+                      ref={personaVideoRef}
+                      autoPlay
+                      playsInline
+                      className="relative w-full h-[400px] object-cover rounded-2xl"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                      }}
+                    />
+
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+
+                    {/* Listening indicator */}
+                    {isListening && (
+                      <div className="absolute top-4 right-4 glass-morphism bg-indigo-500/20 border border-indigo-400/30 rounded-2xl px-4 py-2 flex items-center gap-2 animate-slide-up">
+                        <div className="animate-pulse-glow">
+                          <Mic className="h-4 w-4 text-indigo-300" />
+                        </div>
+                        <span className="text-sm text-indigo-200 font-medium">
+                          Listening...
+                        </span>
+                        <div className="flex gap-1">
+                          <div
+                            className="w-1 bg-indigo-400 rounded-full animate-wave-1"
+                            style={{ height: "8px" }}
+                          />
+                          <div
+                            className="w-1 bg-indigo-400 rounded-full animate-wave-2"
+                            style={{ height: "8px" }}
+                          />
+                          <div
+                            className="w-1 bg-indigo-400 rounded-full animate-wave-3"
+                            style={{ height: "8px" }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Avatar name badge */}
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <div className="glass-morphism bg-black/40 border border-white/10 rounded-2xl px-4 py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full blur-md animate-pulse-glow" />
+                            <div className="relative h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                              <Sparkles className="h-5 w-5 text-white" />
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-white">
+                              Ava AI Assistant
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              Ready to help you
+                            </p>
+                          </div>
+                        </div>
+                        <div className="h-2 w-2 rounded-full bg-emerald-400 animate-dot-pulse" />
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
-              {/* Manual input */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-                  Manual Test Prompt
-                </label>
-                <div className="rounded-2xl border border-slate-700/70 bg-slate-950/70 backdrop-blur-xl p-3 sm:p-4 space-y-2">
-                  <textarea
-                    className="w-full bg-transparent text-sm text-slate-100 placeholder:text-slate-500 outline-none resize-none min-h-[56px] max-h-32 scrollbar-thin scrollbar-thumb-slate-700/70 scrollbar-track-transparent"
-                    placeholder='(Testing only) Type: "Is this good for gaming?"'
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                  />
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[11px] text-slate-500">
-                      In the real kiosk, customers just speak. This box is for
-                      developer testing.
-                    </p>
+              {/* Message input */}
+              <div className="relative glass-morphism neumorphic rounded-3xl p-5 inner-glow">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-indigo-300 flex items-center gap-2">
+                      <Zap className="h-3.5 w-3.5" />
+                      Message Input
+                    </label>
+                    {/* <span className="text-xs text-slate-500">
+                      Developer Mode
+                    </span> */}
+                  </div>
+
+                  <div className="relative">
+                    <div className="relative glass-morphism border border-white/[0.05] rounded-2xl overflow-hidden shadow-inner">
+                      <textarea
+                        className="w-full bg-transparent text-sm text-white placeholder:text-slate-500 outline-none resize-none p-4 min-h-[80px]"
+                        placeholder='Try: "Is this good for gaming?" or "How much RAM does it have?"'
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                      />
+                    </div>
+
                     <button
                       onClick={handleSendMessage}
-                      disabled={!isAvatarReady || !message.trim()}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition
-                        ${
-                          isAvatarReady && message.trim()
-                            ? "bg-indigo-500 text-white hover:bg-indigo-400"
-                            : "bg-slate-700/60 text-slate-400 cursor-not-allowed"
-                        }`}
+                      disabled={!message.trim()}
+                      className="absolute bottom-3 right-3 h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 disabled:from-slate-700 disabled:to-slate-800 flex items-center justify-center shadow-lg disabled:opacity-50 transition-all hover:scale-105 active:scale-95"
                     >
-                      <Mic className="h-3.5 w-3.5" />
-                      Send to Ava
+                      <Send className="h-4 w-4 text-white" />
                     </button>
                   </div>
                 </div>
               </div>
-
-              {/* Dev camera preview */}
-              {/* <details className="text-xs text-slate-500">
-                <summary className="cursor-pointer select-none">
-                  Developer: toggle camera preview
-                </summary>
-                <div className="mt-2 rounded-xl border border-slate-700/60 bg-slate-950/70 p-2 inline-block">
-                  <video
-                    ref={camPreviewRef}
-                    autoPlay
-                    playsInline
-                    className="w-60 h-auto rounded-lg bg-black"
-                  />
-                </div>
-              </details> */}
             </div>
 
-            {/* RIGHT: Specs */}
-            <div className="space-y-4">
-              <motion.div
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="rounded-2xl border border-slate-700/80 bg-slate-950/80 backdrop-blur-xl p-4 sm:p-5 shadow-lg shadow-indigo-900/60"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-indigo-300">
-                      Display Laptop
-                    </p>
-                    <h2 className="mt-1 text-lg font-semibold text-slate-50 flex items-center gap-2">
-                      {LAPTOP_SPECS.model}
-                    </h2>
-                  </div>
-                  <div className="rounded-2xl bg-gradient-to-br from-indigo-500/30 to-purple-500/30 border border-indigo-400/50 px-3 py-2 text-[11px] text-indigo-50">
-                    <div className="flex items-center gap-1">
-                      <Monitor className="h-3.5 w-3.5" />
-                      <span>Ask Ava:</span>
+            {/* Right column - Specs & Status */}
+            <div className="space-y-6 animate-slide-right">
+              {/* Laptop specs card */}
+              <div className="relative glass-morphism neumorphic rounded-3xl p-6 inner-glow">
+                <div className="space-y-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-indigo-300 mb-2">
+                        Display Laptop
+                      </p>
+                      <h2 className="text-xl font-bold text-white">
+                        {LAPTOP_SPECS.model}
+                      </h2>
                     </div>
-                    <ul className="mt-1 space-y-0.5">
-                      <li>• How much RAM is there?</li>
-                      <li>• Is this good for gaming?</li>
-                      <li>• Can I do video editing?</li>
-                    </ul>
+                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-400/30 flex items-center justify-center animate-spin-slow">
+                      <Monitor className="h-6 w-6 text-indigo-300" />
+                    </div>
                   </div>
-                </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <SpecCard
-                    icon={Cpu}
-                    label="Processor"
-                    value={LAPTOP_SPECS.cpu}
-                  />
-                  <SpecCard
-                    icon={MemoryStick}
-                    label="Memory"
-                    value={`${LAPTOP_SPECS.ramGB} GB RAM`}
-                  />
-                  <SpecCard
-                    icon={HardDrive}
-                    label="Storage"
-                    value={LAPTOP_SPECS.storage}
-                  />
-                  <SpecCard
-                    icon={Monitor}
-                    label="Graphics"
-                    value={LAPTOP_SPECS.gpu}
-                  />
-                </div>
+                  {/* Specs grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <SpecCard
+                      icon={Cpu}
+                      label="Processor"
+                      value={LAPTOP_SPECS.cpu}
+                    />
+                    <SpecCard
+                      icon={MemoryStick}
+                      label="Memory"
+                      value={`${LAPTOP_SPECS.ramGB} GB`}
+                    />
+                    <SpecCard
+                      icon={HardDrive}
+                      label="Storage"
+                      value={LAPTOP_SPECS.storage}
+                    />
+                    <SpecCard
+                      icon={Monitor}
+                      label="Graphics"
+                      value={LAPTOP_SPECS.gpu}
+                    />
+                  </div>
 
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
-                  <div>OS: {LAPTOP_SPECS.os}</div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-600/70 px-2 py-0.5">
-                      <Bot className="h-3 w-3 text-indigo-300" />
+                  {/* OS badge */}
+                  <div className="flex items-center justify-between pt-3 border-t border-white/5">
+                    <span className="text-xs text-slate-400">
+                      Operating System
                     </span>
+                    <div className="glass-morphism border border-white/[0.05] rounded-lg px-3 py-1.5">
+                      <span className="text-xs font-medium text-indigo-300">
+                        {LAPTOP_SPECS.os}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
-              {/* Status */}
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="rounded-2xl border border-slate-700/80 bg-slate-950/80 backdrop-blur-xl p-4 text-xs text-slate-300 space-y-2"
-              >
-                <div className="flex items-start gap-2">
-                  <span className="mt-[3px] h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <p>{status}</p>
+              {/* Quick questions card */}
+              <div className="relative glass-morphism neumorphic rounded-3xl p-6 inner-glow">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-indigo-400" />
+                    <h3 className="text-sm font-semibold text-white">
+                      Try Asking Ava
+                    </h3>
+                  </div>
+
+                  <div className="space-y-2">
+                    {[
+                      "Is this good for gaming?",
+                      "Can I do video editing?",
+                      "How much RAM is available?",
+                      "Is this suitable for students?",
+                    ].map((q, i) => (
+                      <div
+                        key={i}
+                        className="glass-morphism border border-white/[0.05] rounded-xl p-3 cursor-pointer hover:bg-white/[0.04] transition-all hover:translate-x-1"
+                      >
+                        <p className="text-sm text-slate-300 flex items-center gap-2">
+                          <CircleDot className="h-3 w-3 text-indigo-400 flex-shrink-0" />
+                          {q}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <p className="text-[11px] text-slate-500">
-                  Tip: in kiosk mode, customers only speak to the laptop. The
-                  avatar auto-starts when someone is in front of the screen
-                  (using face detection), or after a short fallback delay if
-                  face detection is not supported.
-                </p>
-              </motion.div>
+              </div>
+
+              {/* Status card */}
+              <div className="relative glass-morphism neumorphic rounded-3xl p-5 inner-glow">
+                <div className="flex items-start gap-3">
+                  <div className="h-2 w-2 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0 animate-dot-pulse" />
+                  <div className="space-y-2 flex-1">
+                    <p className="text-sm text-white font-medium">{status}</p>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      The kiosk automatically detects customers and activates
+                      the AI assistant. Face detection enables seamless
+                      interaction.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
 };
 
+const StatusBadge = ({ icon: Icon, label, active }) => (
+  <div
+    className={`relative glass-morphism border rounded-xl px-3 py-2 flex items-center gap-2 transition-all ${
+      active
+        ? "bg-emerald-500/10 border-emerald-400/30"
+        : "border-white/[0.05]"
+    }`}
+  >
+    <Icon
+      className={`h-3.5 w-3.5 ${
+        active ? "text-emerald-400" : "text-slate-500"
+      }`}
+    />
+    <span
+      className={`text-xs font-medium ${
+        active ? "text-emerald-300" : "text-slate-400"
+      }`}
+    >
+      {label}
+    </span>
+    <div
+      className={`h-1.5 w-1.5 rounded-full ${
+        active ? "bg-emerald-400 animate-dot-pulse" : "bg-slate-600"
+      }`}
+    />
+  </div>
+);
+
 const SpecCard = ({ icon: Icon, label, value }) => (
-  <div className="rounded-xl border border-slate-700/80 bg-slate-950/80 backdrop-blur-lg px-3 py-3 flex flex-col gap-1 shadow-sm shadow-slate-900/70">
-    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">
-      <Icon className="h-3.5 w-3.5 text-indigo-300" />
-      <span>{label}</span>
+  <div className="relative group">
+    <div className="relative glass-morphism border border-white/[0.05] rounded-2xl p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-all group-hover:bg-white/[0.04] hover:-translate-y-0.5">
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/[0.05] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+      <div className="relative space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-400/20 flex items-center justify-center">
+            <Icon className="h-4 w-4 text-indigo-300" />
+          </div>
+          <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+            {label}
+          </span>
+        </div>
+        <p className="text-sm font-semibold text-white leading-snug">
+          {value}
+        </p>
+      </div>
     </div>
-    <p className="text-sm text-slate-100 leading-snug">{value}</p>
   </div>
 );
 
