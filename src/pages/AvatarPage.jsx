@@ -17,23 +17,22 @@ import {
 import { createClient } from "@anam-ai/js-sdk"; // ✅ Anam SDK
 
 // 🔑 API key (move to .env in real project)
-const ANAM_API_KEY =
-  import.meta.env.VITE_ANAM_API_KEY || "YOUR_ANAM_API_KEY_HERE";
-
+const ANAM_API_KEY ="NjQwMWM3YjktYTUzNC00NDVhLThhZWItZTA5MTE0YThkZWQ2OjVaLzF2VXRSSUl4dkNXNEVBbGpzQlZZS251SlJyd2hxUkRSTldydTFGKzg9";
 // Laptop specs for the persona prompt
 const LAPTOP_SPECS = {
-  model: "Lenovo NexBook 15",
-  cpu: "Intel Core i7 12700H",
+  model: "HP Pavilion 15",
+  cpu: "Intel Core i5 12450H",
   ramGB: 16,
   storage: "512GB NVMe SSD",
-  gpu: "NVIDIA RTX 3050 4GB",
-  os: "Windows 11 Pro",
+  gpu: "NVIDIA GTX 1650 4GB",
+  os: "Windows 11 Home",
 };
+
 
 // Persona config for Anam
 const PERSONA_CONFIG = {
   name: "Ava",
-  avatarId: "30fa96d0-26c4-4e55-94a0-517025942e18",
+  avatarId: "fff604a5-3007-49fd-8b96-8836cd4ceabb",
   voiceId: "91627ebb-7530-4235-bbf2-8c12af2e601c",
   llmId: "ANAM_GPT_4O_MINI_V1",
   systemPrompt: `
