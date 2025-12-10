@@ -17,7 +17,7 @@ import {
 import { createClient } from "@anam-ai/js-sdk"; // ✅ Anam SDK
 
 // 🔑 API key (move to .env in real project)
-const ANAM_API_KEY ="NjQwMWM3YjktYTUzNC00NDVhLThhZWItZTA5MTE0YThkZWQ2OjVaLzF2VXRSSUl4dkNXNEVBbGpzQlZZS251SlJyd2hxUkRSTldydTFGKzg9";
+const ANAM_API_KEY ="MzFjN2Q4ZjctMDE3Ni00NTgxLTlhNmUtZDlhYWVmMmVkYTY3OlpHcExNSVZQMEFoR3ZBOVp1dWRPWFlWWnN2c2Q1SVJPRTd1TmxPUUY1QXc9";
 // Laptop specs for the persona prompt
 const LAPTOP_SPECS = {
   model: "HP Pavilion 15",
