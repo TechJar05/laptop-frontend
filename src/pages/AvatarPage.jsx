@@ -32,7 +32,7 @@ const LAPTOP_SPECS = {
 // Persona config for Anam
 const PERSONA_CONFIG = {
   name: "Ava",
-  avatarId: "fff604a5-3007-49fd-8b96-8836cd4ceabb",
+  avatarId: "30fa96d0-26c4-4e55-94a0-517025942e18",
   voiceId: "91627ebb-7530-4235-bbf2-8c12af2e601c",
   llmId: "ANAM_GPT_4O_MINI_V1",
   systemPrompt: `
