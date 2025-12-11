@@ -15,6 +15,7 @@ import {
   Send,
 } from "lucide-react";
 import { createClient } from "@anam-ai/js-sdk"; // ✅ Anam SDK
+import FaceDetectionService from "../services/FaceDetectionService"; // 👈 adjust path if needed
 
 // 🔑 API key (move to .env in real project)
 const ANAM_API_KEY ="MDAyZjk5ZDMtMDRiZi00MDk2LWI0MWQtMDE2OGZjZDE2YTI0OlZ3UVZ4VDZPRlFiS0oyMFZRdFdOVlJtL2Z0SzZKdDIyeUhIT01KdkhpbkE9";
@@ -27,7 +28,6 @@ const LAPTOP_SPECS = {
   gpu: "NVIDIA GTX 1650 4GB",
   os: "Windows 11 Home",
 };
-
 
 // Persona config for Anam
 const PERSONA_CONFIG = {
@@ -119,7 +119,7 @@ Keep intro around 20–30 seconds, not too long.
 4. Always focus on:
    - What this laptop IS GOOD FOR.
    - What this laptop is NOT IDEAL for (if asked), in a gentle way.
-`
+`,
 };
 
 const AvatarPage = () => {
@@ -133,89 +133,78 @@ const AvatarPage = () => {
   const [customerDetected, setCustomerDetected] = useState(false);
   const [isListening, setIsListening] = useState(false);
 
-  // Internal refs for Anam + camera handling
+  // Internal refs for Anam handling
   const anamClientRef = useRef(null);
   const avatarStartedRef = useRef(false);
-  const cameraStreamRef = useRef(null);
-  const faceDetectorIntervalRef = useRef(null);
 
   // -----------------------------
-  // Camera + Face Detection setup
+  // Camera + Face Detection setup (Mediapipe)
   // -----------------------------
   useEffect(() => {
     let cancelled = false;
 
     const initCameraAndDetect = async () => {
       try {
-        setStatus("Requesting camera access...");
+        setStatus("Initializing camera and face detection...");
 
-        if (!navigator.mediaDevices?.getUserMedia) {
-          setStatus("Camera not supported in this browser.");
+        if (!camPreviewRef.current) {
+          console.warn("Camera preview ref not ready");
+          setStatus("Camera not ready.");
           return;
         }
 
-       const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480 },
-          audio: false, // camera stream only, Anam handles mic on its side
+        // Initialize Mediapipe camera + face detection
+        await FaceDetectionService.initialize(camPreviewRef.current, {
+          onFaceDetected: (isPresent, isWithinRange, distance) => {
+            if (cancelled) return;
+
+            console.log("Face detected?", isPresent, "distance:", distance);
+
+            if (isPresent) {
+              setCustomerDetected(true);
+
+              if (isWithinRange) {
+                setStatus("Customer in front of kiosk. Starting assistant...");
+                // Start avatar ONLY once, and only when within range
+                if (!avatarStartedRef.current) {
+                  startAvatar();
+                }
+              } else {
+                setStatus("Customer detected, please come a bit closer.");
+              }
+            } else {
+              // No face
+              setCustomerDetected(false);
+              if (!avatarStartedRef.current) {
+                setStatus("Waiting for customer...");
+              }
+            }
+          },
+          onFaceDistanceChanged: (distance, isWithinRange, faceSize) => {
+            if (cancelled) return;
+            console.log(
+              "Face distance:",
+              distance,
+              "withinRange:",
+              isWithinRange,
+              "size:",
+              faceSize
+            );
+            // Optional: you can use this later to tweak UI based on distance
+          },
         });
 
         if (cancelled) return;
 
-        cameraStreamRef.current = stream;
         setIsCameraReady(true);
         setStatus("Camera access granted. Waiting for customer...");
-
-        // Attach stream to hidden preview video for FaceDetector
-        if (camPreviewRef.current) {
-          camPreviewRef.current.srcObject = stream;
-          camPreviewRef.current.muted = true;
-          camPreviewRef.current
-            .play()
-            .catch((err) => console.warn("Cam preview play error:", err));
-        }
-
-        // Face detection if supported
-        if ("FaceDetector" in window) {
-          const FaceDetector = window.FaceDetector;
-          const detector = new FaceDetector({
-            fastMode: true,
-            maxDetectedFaces: 1,
-          });
-
-          faceDetectorIntervalRef.current = setInterval(async () => {
-            if (avatarStartedRef.current) return;
-            if (!camPreviewRef.current) return;
-
-            try {
-              const faces = await detector.detect(camPreviewRef.current);
-              if (faces.length > 0) {
-                setCustomerDetected(true);
-                setStatus("Customer detected! Starting assistant...");
-                startAvatar();
-              }
-            } catch (err) {
-              console.error("Face detection error:", err);
-            }
-          }, 1000);
-        } else {
-          console.warn(
-            "FaceDetector not available, using fallback timed start."
+      } catch (error) {
+        console.error("Failed to initialize camera/face detection:", error);
+        if (!cancelled) {
+          setStatus(
+            "Camera or face detection failed. Please check permissions and reload."
           );
-          // Fallback: start after a short delay if no face API
-          setTimeout(() => {
-            if (!avatarStartedRef.current) {
-              setStatus(
-                "Starting assistant (fallback, no face detection support)..."
-              );
-              startAvatar();
-            }
-          }, 5000);
         }
-      } catch (err) {
-        console.error("Camera error:", err);
-        setStatus(
-          "Camera access blocked or failed. Please enable permissions and reload."
-        );
       }
     };
 
@@ -224,14 +213,10 @@ const AvatarPage = () => {
     return () => {
       cancelled = true;
 
-      if (faceDetectorIntervalRef.current) {
-        clearInterval(faceDetectorIntervalRef.current);
-      }
+      // Stop Mediapipe detection
+      FaceDetectionService.stop();
 
-      if (cameraStreamRef.current) {
-        cameraStreamRef.current.getTracks().forEach((t) => t.stop());
-      }
-
+      // Stop Anam streaming if active
       if (anamClientRef.current) {
         anamClientRef.current
           .stopStreaming?.()
@@ -267,7 +252,7 @@ const AvatarPage = () => {
       const client = createClient(data.sessionToken);
       anamClientRef.current = client;
 
-      // Important: pass the video element ID string (like your AvatarFrame)
+      // Important: pass the video element ID string
       await client.streamToVideoElement("persona-video");
 
       setIsAvatarReady(true);
@@ -299,11 +284,9 @@ Just speak normally, and I’ll answer for this exact laptop on the table.
   const handleSendMessage = () => {
     if (!message.trim()) return;
 
-    // Show your listening animation
     setIsListening(true);
     setTimeout(() => setIsListening(false), 2000);
 
-    // Send text to avatar if session active
     if (anamClientRef.current) {
       anamClientRef.current.talk(message.trim());
     }
@@ -351,11 +334,11 @@ Just speak normally, and I’ll answer for this exact laptop on the table.
         }
         @keyframes slide-left {
           from { opacity: 0; transform: translateX(-20px); }
-          to { opacity: 1; transform: translateX(0); }
+          to { transform: translateX(0); opacity: 1; }
         }
         @keyframes slide-right {
           from { opacity: 0; transform: translateX(20px); }
-          to { opacity: 1; transform: translateX(0); }
+          to { transform: translateX(0); opacity: 1; }
         }
         @keyframes border-pulse {
           0%, 100% { opacity: 0.5; }
@@ -397,7 +380,7 @@ Just speak normally, and I’ll answer for this exact laptop on the table.
         }
       `}</style>
 
-      {/* Hidden camera preview (for face detection) – not visible, so UI unchanged */}
+      {/* Hidden camera preview (for face detection) – UI unchanged */}
       <video
         ref={camPreviewRef}
         autoPlay
