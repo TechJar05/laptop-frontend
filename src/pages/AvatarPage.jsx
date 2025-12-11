@@ -19,7 +19,7 @@ import FaceDetectionService from "../services/FaceDetectionService"; // 👈 adj
 
 // 🔑 API key (move to .env in real project)
 const ANAM_API_KEY ="MDAyZjk5ZDMtMDRiZi00MDk2LWI0MWQtMDE2OGZjZDE2YTI0OlZ3UVZ4VDZPRlFiS0oyMFZRdFdOVlJtL2Z0SzZKdDIyeUhIT01KdkhpbkE9";
-// Laptop specs for the persona prompt
+// Laptop specs for the persona prompt 
 const LAPTOP_SPECS = {
   model: "HP Pavilion 15",
   cpu: "Intel Core i5 12450H",
