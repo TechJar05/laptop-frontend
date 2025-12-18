@@ -15,7 +15,7 @@ import {
   Send,
 } from "lucide-react";
 import { createClient } from "@anam-ai/js-sdk"; // ✅ Anam SDK
-import FaceDetectionService from "../services/FaceDetectionService.js"; // 🎭 Mediapipe face detection service
+import FaceDetectionService from "../services/FaceDetectionService"; 
 
 // 🔑 API key (move to .env in real project)
 const ANAM_API_KEY =
