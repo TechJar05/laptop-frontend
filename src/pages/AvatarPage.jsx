@@ -15,11 +15,12 @@ import {
   Send,
 } from "lucide-react";
 import { createClient } from "@anam-ai/js-sdk"; // ✅ Anam SDK
-import FaceDetectionService from "../services/FaceDetectionService" 
+import FaceDetectionService from "../services/FaceDetectionService";
 
 // 🔑 API key (move to .env in real project)
-const ANAM_API_KEY ="MDAyZjk5ZDMtMDRiZi00MDk2LWI0MWQtMDE2OGZjZDE2YTI0OlZ3UVZ4VDZPRlFiS0oyMFZRdFdOVlJtL2Z0SzZKdDIyeUhIT01KdkhpbkE9";
-// Laptop specs for the persona prompt 
+const ANAM_API_KEY =
+  "ODhmY2JlZmItNGZhMS00NjM0LWI4MzQtMDRhMjM0MGQ1MTNhOmZwbHgzMFNoaTFqT04wK2NpRXQ4WTZiMlZHV2NWd2RUdUlRa0lVdWhzVnc9";
+// Laptop specs for the persona prompt
 const LAPTOP_SPECS = {
   model: "HP Pavilion 15",
   cpu: "Intel Core i5 12450H",
@@ -675,9 +676,7 @@ Just speak normally, and I’ll answer for this exact laptop on the table.
 const StatusBadge = ({ icon: Icon, label, active }) => (
   <div
     className={`relative glass-morphism border rounded-xl px-3 py-2 flex items-center gap-2 transition-all ${
-      active
-        ? "bg-emerald-500/10 border-emerald-400/30"
-        : "border-white/[0.05]"
+      active ? "bg-emerald-500/10 border-emerald-400/30" : "border-white/[0.05]"
     }`}
   >
     <Icon
@@ -714,9 +713,7 @@ const SpecCard = ({ icon: Icon, label, value }) => (
             {label}
           </span>
         </div>
-        <p className="text-sm font-semibold text-white leading-snug">
-          {value}
-        </p>
+        <p className="text-sm font-semibold text-white leading-snug">{value}</p>
       </div>
     </div>
   </div>
